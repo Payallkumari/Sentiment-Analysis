@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
-import SummaryTable, { groupCategory } from "../components/SummaryTable";
+import { groupCategory } from "../utils/sentimentUtils";
+import SummaryTable from "../components/SummaryTable";
 
 const Bank = ({ data }) => {
   const [selectedApp, setSelectedApp] = useState("Sunwai");
@@ -13,27 +14,41 @@ const Bank = ({ data }) => {
     return data.filter((d) => d.app === selectedApp);
   }, [data, selectedApp]);
 
-  // Total Reviews
   const totalReviews = filteredData.length;
 
-  // Average Score
   const avgScore = useMemo(() => {
-    const validScores = filteredData.map((d) => parseFloat(d.score)).filter((s) => !isNaN(s));
+    const validScores = filteredData
+      .map((d) => parseFloat(d.score))
+      .filter((s) => !isNaN(s));
     const total = validScores.reduce((acc, val) => acc + val, 0);
     return validScores.length ? (total / validScores.length).toFixed(2) : "N/A";
   }, [filteredData]);
 
-  // Review Period
   const reviewPeriod = useMemo(() => {
-    const dates = filteredData.map((d) => new Date(d.timestamp)).filter((d) => !isNaN(d));
-    if (dates.length === 0) return "N/A";
-    const min = new Date(Math.min(...dates));
-    const max = new Date(Math.max(...dates));
-    const format = (date) => date.toLocaleString("default", { month: "short", year: "numeric" });
-    return `${format(min)} - ${format(max)}`;
+    const parseCustomDate = (str) => {
+      if (!str) return null;
+      const match = str.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return null;
+      const [, day, month, year] = match.map(Number);
+      return new Date(year, month - 1, day);
+    };
+
+    const validDates = filteredData
+      .map((d) => parseCustomDate(d.timestamp))
+      .filter((d) => d instanceof Date && !isNaN(d))
+      .sort((a, b) => a - b);
+
+    if (validDates.length === 0) return "N/A";
+
+    const format = (date) =>
+      date.toLocaleString("default", { month: "short", year: "numeric" });
+
+    const start = format(validDates[0]);
+    const end = format(validDates[validDates.length - 1]);
+
+    return start === end ? start : `${start} - ${end}`;
   }, [filteredData]);
 
-  // Top Complaint Category (cleaned and grouped)
   const topComplaintCategory = useMemo(() => {
     const categoryCount = {};
 
@@ -55,53 +70,50 @@ const Bank = ({ data }) => {
   }, [filteredData]);
 
   return (
-    <div className="p-6 bg-white text-gray-800 min-h-screen">
-      {/* App Selector */}
-      <div className="mb-6">
-        <label className="text-gray-800 mr-4">Select App:</label>
-        <select
-          value={selectedApp}
-          onChange={(e) => setSelectedApp(e.target.value)}
-          className="bg-white text-gray-800 p-2 rounded border border-gray-300 focus:border-green-500 focus:ring focus:ring-green-200"
-        >
-          {apps.map((app) => (
-            <option key={app} value={app}>{app}</option>
-          ))}
-        </select>
+    <div className="px-6 py-8 min-h-screen text-gray-800">
+      {/* Cards Row */}
+      <div className="flex flex-wrap items-start gap-4 mb-10">
+        {/* App Selector Card */}
+        <div className="bg-green-700 px-4 py-3 rounded-lg shadow-sm border border-green-800 flex flex-col items-center justify-center text-center min-w-[150px] max-w-[180px] h-20">
+          <div className="text-xs text-green-100 font-medium mb-1">Select App</div>
+          <select
+            value={selectedApp}
+            onChange={(e) => setSelectedApp(e.target.value)}
+            className="bg-transparent text-white text-sm font-semibold focus:outline-none"
+          >
+            {apps.map((app) => (
+              <option key={app} value={app} className="text-black">
+                {app}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Summary Cards */}
+        <SummaryCard title="Total Reviews" value={totalReviews} />
+        <SummaryCard title="Avg. Score" value={avgScore} />
+        <SummaryCard title="Review Period" value={reviewPeriod} />
+        <SummaryCard title="Top Complaint Category" value={topComplaintCategory} />
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center mb-8">
-        <div className="bg-white p-4 rounded-xl text-center border border-gray-200">
-          <div className="text-sm text-gray-500">Total Reviews</div>
-          <div className="text-2xl font-bold text-gray-800">{totalReviews}</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl text-center border border-gray-200">
-          <div className="text-sm text-gray-500">Avg. Score</div>
-          <div className="text-2xl font-bold text-gray-800">{avgScore}</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl text-center border border-gray-200">
-          <div className="text-sm text-gray-500">Review Period</div>
-          <div className="text-lg font-medium text-gray-800">{reviewPeriod}</div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl text-center border border-gray-200">
-          <div className="text-sm text-gray-500">Top Complaint Category</div>
-          <div className="text-lg font-medium text-gray-800">{topComplaintCategory}</div>
-        </div>
-      </div>
-
-      {/* Sentiment by Complaint Category */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200">
-        <h2 className="text-xl font-semibold mb-2 text-gray-800">
-          Sentiment by Complaint Category - {selectedApp}
+      {/* Summary Table */}
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+        <h2 className="text-xl font-semibold mb-4 text-gray-800">
+          Sentiment by Complaint Category -{" "}
+          <span className="text-green-600">{selectedApp}</span>
         </h2>
         <SummaryTable data={filteredData} defaultFilter="sentimentCategory" />
       </div>
     </div>
   );
 };
+
+// SummaryCard component
+const SummaryCard = ({ title, value }) => (
+  <div className="bg-green-700 px-4 py-3 rounded-lg shadow-sm border border-green-800 flex flex-col items-center justify-center text-center min-w-[150px] max-w-[180px] h-20 transition-all duration-300 hover:shadow-lg">
+    <div className="text-xs text-green-100 font-medium line-clamp-1">{title}</div>
+    <div className="mt-1 text-lg font-semibold text-white line-clamp-1">{value}</div>
+  </div>
+);
 
 export default Bank;

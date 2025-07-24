@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
-import { supabase } from "./supabaseClient"; // <-- import Supabase client
+import { supabase } from "./supabaseClient"; 
 import SummaryTable from "./components/SummaryTable";
 import Bank from "./pages/Bank";
 import CategorySummary from "./pages/CategorySummary";
@@ -14,8 +13,8 @@ export default function App() {
   useEffect(() => {
     const fetchReviews = async () => {
       const { data, error } = await supabase
-        .from("reviews") // your table name
-        .select("*"); // select all fields
+        .from("reviews") 
+        .select("*"); 
 
       if (error) {
         console.error("Error fetching reviews:", error.message);
@@ -30,9 +29,9 @@ export default function App() {
   }, []);
 
   return (
-    <Router>
+    <Router basename="/Sentiment-Analysis">
       <div className="bg-white min-h-screen text-gray-800">
-        <Navbar />
+        <Navbar publicUrl={process.env.PUBLIC_URL} /> 
         <div className="p-6">
           {loading ? (
             <div>Loading reviews...</div>

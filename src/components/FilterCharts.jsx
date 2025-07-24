@@ -1,135 +1,96 @@
-import { useEffect, useState } from "react";
-import {
-  groupCategory,
-  computeOverallSentiment,
-  normalize,
-  capitalize,
-} from "./SummaryTable";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
-import Papa from "papaparse";
+import { useState, useEffect } from "react";
+import {groupCategory,normalize,capitalize,} from "../utils/sentimentUtils";
+import {BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,Legend,} from "recharts";
+import { supabase } from "../supabaseClient";
 
-const COLORS = [
-  "#28a745",
-  "#34c759",
-  "#e6f4ea",
-  "#6c757d",
-];
+const COLORS = ["#28a745", "#34c759", "#e6f4ea", "#6c757d"];
 
-export default function FilterCharts({ data, filterType }) {
+export default function FilterCharts({ data, filterType, selectedApp }) {
   const [isDrilledDown, setIsDrilledDown] = useState(false);
   const [drillDownData, setDrillDownData] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [csvData, setCsvData] = useState([]);
-
   const chartMargin = { top: 20, right: 30, left: 20, bottom: 80 };
 
   useEffect(() => {
-    Papa.parse("/summarized_output.csv", {
-      download: true,
-      header: true,
-      complete: function (results) {
-        setCsvData(results.data);
-      },
-    });
-  }, []);
+    setIsDrilledDown(false);
+    setDrillDownData([]);
+    setSelectedItem(null);
+  }, [filterType, data]);
 
-  if (!filterType || !data || data.length === 0) return null;
+  if (!filterType || !data || data.length === 0) {
+    return <div className="p-4 text-gray-700">No data available to display.</div>;
+  }
 
-  // Preprocess data based on filter type
-  const processedData = (() => {
-    switch (filterType) {
-      case "bank":
-        return Object.entries(data).map(([app, stats]) => ({
-          app,
-          positive: stats.types.positive || 0,
-          neutral: stats.types.neutral || 0,
-          negative: stats.types.negative || 0,
-        }));
-      case "review":
-        return data;
-      case "category":
-      case "bankCategory":
-      case "topAspects":
-      case "topOpinions":
-      case "categoriesPerBank":
-      case "sentimentCategory":
-        return data;
-      default:
-        return data;
+  const processedData = filterType === "bank"
+    ? Object.entries(data).map(([app, stats]) => ({
+        app,
+        positive: stats.types?.positive || 0,
+        neutral: stats.types?.neutral || 0,
+        negative: stats.types?.negative || 0,
+      }))
+    : data;
+
+  const handleDrillDown = async (entry, filterType, barKey = null) => {
+    console.log("Drilldown entry:", entry, "filterType:", filterType, "barKey:", barKey, "selectedApp:", selectedApp);
+
+    let query = supabase.from("summaries").select("*");
+
+    if (filterType === "bank") {
+      query = query.filter("app", "eq", entry.app)
+                   .filter("sentiment", "eq", barKey);
+    } else if (filterType === "review") {
+      query = query.filter("sentiment", "eq", entry.type);
+    } else if (filterType === "bankCategory") {
+      query = query.filter("app", "eq", entry.app);
+    } else if (filterType === "categoriesPerBank") {
+      query = query.filter("app", "eq", entry.app);
+    } else if (filterType === "sentimentCategory") {
+      if (selectedApp) query = query.filter("app", "eq", selectedApp);
+      query = query.filter("sentiment", "eq", barKey);
     }
-  })();
 
-  const handleDrillDown = (entry, filterType) => {
-    let filteredData = [];
+    const { data: result, error } = await query;
 
-    if (["topAspects", "topOpinions"].includes(filterType)) {
-      const fieldToCheck = filterType === "topAspects" ? "aspects" : "opinions";
-      filteredData = csvData.filter((row) => {
-        const items = (row[fieldToCheck] || "")
+    if (error) {
+      console.error("Drilldown fetch error:", error.message);
+      setDrillDownData([]);
+      setIsDrilledDown(true);
+      return;
+    }
+
+    let filtered = result;
+
+    // if (filterType === "category" || filterType === "bankCategory") {
+    //   const targetCategory = filterType === "category" ? entry.category : entry.topCategory;
+    //   filtered = result.filter(d => {
+    //     const rawCats = (d.mapped_categories || "")
+    //       .split(",")
+    //       .map(c => capitalize(normalize(c.trim())));
+    //     return rawCats.some(rc => groupCategory(rc) === targetCategory);
+    //   }).map(d => ({ ...d, matchedKeyword: targetCategory }));
+    // }
+
+    if (filterType === "topAspects") {
+      filtered = result.filter(d => {
+        const aspects = (d.aspects || "")
           .split(",")
-          .map((item) => capitalize(normalize(item.trim())));
-        return items.includes(entry.item);
-      });
-    } else {
-      switch (filterType) {
-        case "bank":
-          filteredData = csvData.filter((d) => d.app === entry.app);
-          break;
-        case "review":
-          filteredData = csvData.filter(
-            (d) => computeOverallSentiment(d) === entry.type
-          );
-          break;
-        case "category":
-          filteredData = csvData.filter((d) => {
-            const categories = (d.mapped_categories || "")
-              .split(",")
-              .map((cat) => capitalize(normalize(cat.trim())));
-            return categories.some((cat) =>
-              groupCategory(cat) === entry.category
-            );
-          });
-          break;
-        case "bankCategory":
-          filteredData = csvData.filter((d) => {
-            if (d.app !== entry.app) return false;
-            const categories = (d.mapped_categories || "")
-              .split(",")
-              .map((cat) => capitalize(normalize(cat.trim())));
-            return categories.some((cat) =>
-              groupCategory(cat) === entry.topCategory
-            );
-          });
-          break;
-        case "categoriesPerBank":
-          filteredData = csvData.filter((d) => d.app === entry.app);
-          break;
-        case "sentimentCategory":
-          filteredData = csvData.filter((d) => {
-            let opinions = (d.opinions || "")
-              .split(",")
-              .map((item) => capitalize(normalize(item.trim())));
-            return opinions.includes(entry.item) && d.app === "HBL";
-          });
-          break;
-        default:
-          filteredData = [];
-      }
+          .map(a => capitalize(normalize(a.trim())));
+        return aspects.includes(entry.item);
+      }).map(d => ({ ...d, matchedKeyword: entry.item }));
     }
 
-    setDrillDownData(filteredData);
-    setSelectedItem(entry);
+    if (filterType === "topOpinions" || filterType === "sentimentCategory") {
+      filtered = result.filter(d => {
+        const opinions = (d.opinions || "")
+          .split(",")
+          .map(o => capitalize(normalize(o.trim())));
+        return opinions.includes(entry.item);
+      }).map(d => ({ ...d, matchedKeyword: entry.item }));
+    }
+
+    console.log("Filtered drilldown rows:", filtered);
+    setDrillDownData(filtered);
+    setSelectedItem({ ...entry, barKey });
     setIsDrilledDown(true);
   };
 
@@ -140,37 +101,46 @@ export default function FilterCharts({ data, filterType }) {
   };
 
   const renderDrillDownTable = () => {
-    const columns = Object.keys(csvData[0] || {}).map(capitalize);
-    const keys = Object.keys(csvData[0] || {});
+    if (drillDownData.length === 0) {
+      return (
+        <div className="text-gray-700 p-4">
+          No data available for this selection.<br />
+          Check console log for filter details.
+        </div>
+      );
+    }
+
+    const columns = ["app", "sentiment", "summary"];
+    const hasKeyword = drillDownData[0]?.matchedKeyword !== undefined;
 
     return (
-      <div>
+      <div className="p-4">
         <button
           onClick={handleBack}
           className="mb-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-500"
         >
           Back to Chart
         </button>
-        <table className="table-auto w-full text-left text-sm text-gray-700">
-          <thead>
-            <tr>
-              {columns.map((col, idx) => (
-                <th key={idx} className="p-2 bg-gray-50 border-b border-gray-200">
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {drillDownData.map((row, index) => (
-              <tr key={index} className="border-b border-gray-200">
-                {keys.map((key, idx) => (
-                  <td key={idx} className="p-2">{row[key]}</td>
+        <div className="overflow-x-auto">
+          <table className="table-auto w-full text-left text-sm text-gray-700">
+            <thead>
+              <tr>
+                {columns.map(c => (
+                  <th key={c} className="p-2 bg-gray-50 border-b">{capitalize(c)}</th>
                 ))}
+                {hasKeyword && <th className="p-2 bg-gray-50 border-b">Matched Keyword</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {drillDownData.map((row, idx) => (
+                <tr key={idx} className="border-b">
+                  {columns.map(c => <td key={c} className="p-2">{row[c] || '-'}</td>)}
+                  {hasKeyword && <td className="p-2">{row.matchedKeyword}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
@@ -180,21 +150,15 @@ export default function FilterCharts({ data, filterType }) {
       case "bank":
         return (
           <ResponsiveContainer width="100%" height={350}>
-            <BarChart
-              data={processedData}
-              margin={chartMargin}
-            >
+            <BarChart data={processedData} margin={chartMargin}>
               <XAxis dataKey="app" angle={-25} textAnchor="end" interval={0} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="positive" stackId="a" fill="#28a745" onClick={(d) => handleDrillDown(d, filterType)} />
-              <Bar dataKey="neutral" stackId="a" fill="#e6f4ea" onClick={(d) => handleDrillDown(d, filterType)} />
-              <Bar dataKey="negative" stackId="a" fill="#6c757d" onClick={(d) => handleDrillDown(d, filterType)} />
+              <YAxis /><Tooltip /><Legend />
+              <Bar dataKey="positive" stackId="a" fill={COLORS[0]} onClick={d => handleDrillDown(d, filterType, "positive")} />
+              <Bar dataKey="neutral" stackId="a" fill={COLORS[2]} onClick={d => handleDrillDown(d, filterType, "neutral")} />
+              <Bar dataKey="negative" stackId="a" fill={COLORS[3]} onClick={d => handleDrillDown(d, filterType, "negative")} />
             </BarChart>
           </ResponsiveContainer>
         );
-
       case "review":
         return (
           <ResponsiveContainer width="100%" height={350}>
@@ -207,72 +171,57 @@ export default function FilterCharts({ data, filterType }) {
                 cy="50%"
                 outerRadius={100}
                 label
-                onClick={(d) => handleDrillDown(d, filterType)}
+                onClick={d => handleDrillDown(d, filterType)}
               >
-                {processedData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
+                {processedData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
-              <Tooltip />
-              <Legend />
+              <Tooltip /><Legend />
             </PieChart>
           </ResponsiveContainer>
         );
-
       case "category":
       case "bankCategory":
       case "topAspects":
       case "topOpinions":
       case "categoriesPerBank":
+        return (
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={processedData} margin={chartMargin}>
+              <XAxis dataKey={
+                filterType === "category" ? "category" :
+                filterType === "bankCategory" ? "app" : "item"
+              } angle={-25} textAnchor="end" interval={0} />
+              <YAxis /><Tooltip />
+              <Bar
+                dataKey={
+                  filterType === "category" ? "ratio" :
+                  filterType === "categoriesPerBank" ? "categoryCount" : "count"
+                }
+                fill={COLORS[0]}
+                onClick={d => handleDrillDown(d, filterType)}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        );
       case "sentimentCategory":
         return (
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={processedData} margin={chartMargin}>
-              <XAxis
-                dataKey={
-                  filterType === "category" || filterType === "sentimentCategory"
-                    ? "category"
-                    : filterType === "bankCategory"
-                    ? "app"
-                    : "item"
-                }
-                angle={-25}
-                textAnchor="end"
-                interval={0}
-              />
-              <YAxis />
-              <Tooltip />
-              {["sentimentCategory", "bank"].includes(filterType) ? (
-                <>
-                  <Legend />
-                  <Bar dataKey="positive" stackId="a" fill="#28a745" onClick={(d) => handleDrillDown(d, filterType)} />
-                  <Bar dataKey="neutral" stackId="a" fill="#e6f4ea" onClick={(d) => handleDrillDown(d, filterType)} />
-                  <Bar dataKey="negative" stackId="a" fill="#6c757d" onClick={(d) => handleDrillDown(d, filterType)} />
-                </>
-              ) : (
-                <Bar
-                  dataKey={
-                    filterType === "category"
-                      ? "ratio"
-                      : filterType === "categoriesPerBank"
-                      ? "categoryCount"
-                      : "count"
-                  }
-                  fill="#28a745"
-                  onClick={(d) => handleDrillDown(d, filterType)}
-                />
-              )}
+              <XAxis dataKey="category" angle={-25} textAnchor="end" interval={0} />
+              <YAxis /><Tooltip /><Legend />
+              <Bar dataKey="positive" stackId="a" fill={COLORS[0]} onClick={d => handleDrillDown(d, filterType, "positive")} />
+              <Bar dataKey="neutral" stackId="a" fill={COLORS[2]} onClick={d => handleDrillDown(d, filterType, "neutral")} />
+              <Bar dataKey="negative" stackId="a" fill={COLORS[3]} onClick={d => handleDrillDown(d, filterType, "negative")} />
             </BarChart>
           </ResponsiveContainer>
         );
-
       default:
         return null;
     }
   };
 
   return (
-    <div className="p-4 bg-white rounded-xl w-full md:w-1/2 mt-4 border border-gray-200">
+    <div className="p-4 bg-white rounded-xl w-full   border border-gray-200">
       <h3 className="text-md font-bold mb-2 text-gray-800">📊 Chart View</h3>
       {isDrilledDown ? renderDrillDownTable() : renderChart()}
     </div>
