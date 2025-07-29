@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { format } from "date-fns";
 import { useLocation } from "react-router-dom";
 import Chart from "chart.js/auto";
 import FilterCharts from "./FilterCharts";
-import {normalize,
+import {
+  normalize,
   capitalize,
   computeOverallSentiment,
   groupCategory,
@@ -27,7 +27,7 @@ const SummaryTable = ({ data = [] }) => {
   const bankChartInstance = useRef(null);
 
   const location = useLocation();
-  const isSummaryPage = location.pathname === "/"; 
+  const isSummaryPage = location.pathname === "/";
 
   const generateBankColors = (banks) => {
     const colors = [
@@ -57,21 +57,23 @@ const SummaryTable = ({ data = [] }) => {
       else if (sentiment === "negative") stats.negative++;
     });
     const total = data.length;
-    return {
-      total,
-      positive: {
+    return [
+      {
+        sentiment: "Positive",
         count: stats.positive,
         percentage: Math.round((stats.positive / total) * 100) || 0,
       },
-      neutral: {
+      {
+        sentiment: "Neutral",
         count: stats.neutral,
         percentage: Math.round((stats.neutral / total) * 100) || 0,
       },
-      negative: {
+      {
+        sentiment: "Negative",
         count: stats.negative,
         percentage: Math.round((stats.negative / total) * 100) || 0,
       },
-    };
+    ];
   };
 
   const categoryRatios = () => {
@@ -255,7 +257,7 @@ const SummaryTable = ({ data = [] }) => {
   const topCategory = getTopCategory();
 
   useEffect(() => {
-    if (isSummaryPage && chartRef.current && sentimentData.total > 0) {
+    if (isSummaryPage && chartRef.current && sentimentData.length > 0) {
       if (chartInstance.current) chartInstance.current.destroy();
       const ctx = chartRef.current.getContext("2d");
       chartInstance.current = new Chart(ctx, {
@@ -265,9 +267,9 @@ const SummaryTable = ({ data = [] }) => {
           datasets: [
             {
               data: [
-                sentimentData.positive.percentage,
-                sentimentData.neutral.percentage,
-                sentimentData.negative.percentage,
+                sentimentData[0].percentage,
+                sentimentData[1].percentage,
+                sentimentData[2].percentage,
               ],
               backgroundColor: [
                 "rgba(34, 197, 94, 0.7)",
@@ -350,118 +352,110 @@ const SummaryTable = ({ data = [] }) => {
             </h2>
           </section>
 
-         
-      <section className="flex flex-col md:flex-row items-center justify-between gap-6 mb-6">
-        <div className="p-6 bg-white border border-gray-200  shadow-sm w-full md:w-1/2 flex flex-col md:flex-row md:items-center justify-between">
-          <div className="mb-4 md:mb-0 md:mr-6 text-center md:text-left">
-            <h5 className="text-sm text-gray-500 font-medium">
-              Total Feedback
-            </h5>
-            <p className="text-2xl font-bold text-gray-800">
-              {sentimentData.total}
-            </p>
-          </div>
-          <div className="flex gap-7 justify-center">
-            {[
-              {
-                label: "Positive",
-                value: `${sentimentData.positive.percentage}%`,
-                color: "bg-green-100 text-green-700",
-              },
-              {
-                label: "Neutral",
-                value: `${sentimentData.neutral.percentage}%`,
-                color: "bg-yellow-100 text-yellow-700",
-              },
-              {
-                label: "Negative",
-                value: `${sentimentData.negative.percentage}%`,
-                color: "bg-red-100 text-red-700",
-              },
-            ].map((stat, idx) => (
-              <div
-                key={idx}
-                className={`px-5 py-2 min-w-[120px]  border border-gray-200 text-center shadow-sm ${stat.color}`}
-              >
-                <p className="text-xs font-semibold">{stat.label}</p>
-                <p className="text-lg font-bold mt-1">{stat.value}</p>
+          <section className="flex flex-col md:flex-row items-center justify-between gap-6 mb-6">
+            <div className="p-6 bg-white border border-gray-200 shadow-sm w-full md:w-1/2 flex flex-col md:flex-row md:items-center justify-between">
+              <div className="mb-4 md:mb-0 md:mr-6 text-center md:text-left">
+                <h5 className="text-sm text-gray-500 font-medium">
+                  Total Feedback
+                </h5>
+                <p className="text-2xl font-bold text-gray-800">
+                  {sentimentData.reduce((acc, curr) => acc + curr.count, 0)}
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
-  <div className="p-5 bg-white border border-gray-200 shadow-sm md:w-1/2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-3 bg-green-50 border border-green-200 rounded-lg shadow text-center">
-            <p className="text-xs font-medium text-green-700">Avg Rating</p>
-            <p className="text-xl font-bold text-green-900 mt-1">
-              {avgRatingValue}
-            </p>
-          </div>
+              <div className="flex gap-7 justify-center">
+                {sentimentData.map((stat, idx) => (
+                  <div
+                    key={idx}
+                    className={`px-5 py-2 min-w-[120px] border border-gray-200 text-center shadow-sm ${
+                      stat.sentiment === "Positive"
+                        ? "bg-green-100 text-green-700"
+                        : stat.sentiment === "Neutral"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    <p className="text-xs font-semibold">{stat.sentiment}</p>
+                    <p className="text-lg font-bold mt-1">
+                      {stat.percentage}%
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-5 bg-white border border-gray-200 shadow-sm md:w-1/2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg shadow text-center">
+                <p className="text-xs font-medium text-green-700">Avg Rating</p>
+                <p className="text-xl font-bold text-green-900 mt-1">
+                  {avgRatingValue}
+                </p>
+              </div>
 
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg shadow text-center">
-            <p className="text-xs font-medium text-yellow-700">Top Complaint</p>
-            <p className="text-sm font-semibold text-yellow-900 mt-1 break-words">
-              {topCategory}
-            </p>
-          </div>
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg shadow text-center">
+                <p className="text-xs font-medium text-yellow-700">
+                  Top Complaint
+                </p>
+                <p className="text-sm font-semibold text-yellow-900 mt-1 break-words">
+                  {topCategory}
+                </p>
+              </div>
 
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg shadow text-center">
-            <p className="text-xs font-medium text-blue-700">Total Apps</p>
-            <p className="text-xl font-bold text-blue-900 mt-1">
-              {new Set(data.map((item) => item.app)).size}
-            </p>
-          </div>
-        </div>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg shadow text-center">
+                <p className="text-xs font-medium text-blue-700">Total Apps</p>
+                <p className="text-xl font-bold text-blue-900 mt-1">
+                  {new Set(data.map((item) => item.app)).size}
+                </p>
+              </div>
+            </div>
+          </section>
 
+          <section className="flex w-full gap-5">
+            <div className="w-1/2">
+              <div className="flex flex-wrap h-full bg-white border border-gray-200 shadow-sm rounded-lg">
+                <div className="w-full md:w-1/2 p-4">
+                  <h3 className="text-md font-semibold mb-1 text-gray-600">
+                    Sentiment Distribution
+                  </h3>
+                  <div className="flex items-center mb-3">
+                    <span className="inline-block w-3 h-3 bg-green-500 mr-2"></span>
+                    <span className="text-sm text-gray-600">Positive</span>
+                    <span className="inline-block w-3 h-3 bg-yellow-500 mx-2"></span>
+                    <span className="text-sm text-gray-600">Neutral</span>
+                    <span className="inline-block w-3 h-3 bg-red-500 mr-2"></span>
+                    <span className="text-sm text-gray-600">Negative</span>
+                  </div>
+                  <div className="relative w-full h-40 flex justify-center items-center">
+                    <canvas ref={chartRef} className="h-full w-auto"></canvas>
+                    <div className="absolute text-center">
+                      <p className="text-xs text-gray-600">Total Feedback</p>
+                    </div>
+                  </div>
+                </div>
 
-      </section>
+                <div className="w-full md:w-1/2 p-4">
+                  <h3 className="text-md font-semibold mb-5 text-gray-600">
+                    Reviews Per Bank
+                  </h3>
+                  <div className="flex flex-wrap items-center mb-3 gap-x-4 gap-y-2"></div>
+                  <div className="relative w-full h-40 flex justify-center items-center">
+                    <canvas ref={bankChartRef} className="h-full w-auto"></canvas>
+                    <div className="absolute text-center">
+                      <p className="text-xs text-gray-600">Total Reviews</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-
-    <section className="flex w-full gap-5">
-  <div className="w-1/2 ">
-    <div className="flex flex-wrap h-full bg-white border border-gray-200 shadow-sm rounded-lg">
-      <div className="w-full md:w-1/2 p-4">
-        <h3 className="text-md font-semibold mb-1 text-gray-600">
-          Sentiment Distribution
-        </h3>
-        <div className="flex items-center mb-3">
-          <span className="inline-block w-3 h-3 bg-green-500 mr-2"></span>
-          <span className="text-sm text-gray-600">Positive</span>
-          <span className="inline-block w-3 h-3 bg-yellow-500 mx-2"></span>
-          <span className="text-sm text-gray-600">Neutral</span>
-          <span className="inline-block w-3 h-3 bg-red-500 mr-2"></span>
-          <span className="text-sm text-gray-600">Negative</span>
-        </div>
-        <div className="relative w-full h-40 flex justify-center items-center">
-          <canvas ref={chartRef} className="h-full w-auto"></canvas>
-          <div className="absolute text-center">
-            <p className="text-xs text-gray-600">Total Feedback</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="w-full md:w-1/2 p-4">
-        <h3 className="text-md font-semibold mb-5 text-gray-600">
-          Reviews Per Bank
-        </h3>
-        <div className="flex flex-wrap items-center mb-3 gap-x-4 gap-y-2">
-        </div>
-        <div className="relative w-full h-40 flex justify-center items-center">
-          <canvas ref={bankChartRef} className="h-full w-auto"></canvas>
-          <div className="absolute text-center">
-            <p className="text-xs text-gray-600">Total Reviews</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div className="w-1/2 ">
-    <div className="h-full bg-white border border-gray-200 shadow-sm rounded-lg flex items-center justify-center text-gray-400">
-  
-    </div>
-  </div>
-</section>
-
+            <div className="w-1/2">
+              <div className="h-full bg-white border border-gray-200 shadow-sm rounded-lg flex items-center justify-center text-gray-400">
+                <img
+                  src={process.env.PUBLIC_URL + "/chart.png"}
+                  alt=""
+                  className="h-[85%] w-[85%] object-contain"
+                />
+              </div>
+            </div>
+          </section>
         </>
       )}
 
@@ -518,9 +512,32 @@ const SummaryTable = ({ data = [] }) => {
                 <SentimentByCategoryTable data={chartData} />
               )}
               {filterType === "bank" && <BankReviewTable data={chartData} />}
-              {filterType === "review" && (
-                <SentimentSummaryTable data={chartData} />
-              )}
+             {filterType === "review" && (
+  <table className="min-w-full bg-white border border-gray-200">
+    <thead>
+      <tr className="bg-gray-100">
+        <th className="py-2 px-4 border-b text-left text-gray-600">Review Type</th>
+        <th className="py-2 px-4 border-b text-left text-gray-600">Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {chartData && chartData.length > 0 ? (
+        chartData.map((item, index) => (
+          <tr key={index} className="hover:bg-gray-50">
+            <td className="py-2 px-4 border-b">{item.sentiment}</td>
+            <td className="py-2 px-4 border-b">{item.count}</td>
+          </tr>
+        ))
+      ) : (
+        <tr>
+          <td colSpan="2" className="py-2 px-4 text-center text-gray-500">
+            No data available
+          </td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+)}
             </div>
 
             {filterType !== "categoriesPerBank" && (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import {groupCategory,normalize,capitalize,} from "../utils/sentimentUtils";
+import {normalize,capitalize,} from "../utils/sentimentUtils";
 import {BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,Legend,} from "recharts";
 import { supabase } from "../supabaseClient";
 
@@ -8,7 +8,7 @@ const COLORS = ["#28a745", "#34c759", "#e6f4ea", "#6c757d"];
 export default function FilterCharts({ data, filterType, selectedApp }) {
   const [isDrilledDown, setIsDrilledDown] = useState(false);
   const [drillDownData, setDrillDownData] = useState([]);
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [, setSelectedItem] = useState(null);
   const chartMargin = { top: 20, right: 30, left: 20, bottom: 80 };
 
   useEffect(() => {
@@ -221,7 +221,7 @@ export default function FilterCharts({ data, filterType, selectedApp }) {
   };
 
   return (
-    <div className="p-4 bg-white rounded-xl w-full   border border-gray-200">
+    <div className="p-4 bg-white rounded-xl w-1/2  border border-gray-200">
       <h3 className="text-md font-bold mb-2 text-gray-800">📊 Chart View</h3>
       {isDrilledDown ? renderDrillDownTable() : renderChart()}
     </div>
