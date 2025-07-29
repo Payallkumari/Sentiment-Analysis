@@ -20,7 +20,7 @@ import {
 } from "./TableViews";
 
 const SummaryTable = ({ data = [] }) => {
-  const [filterType, setFilterType] = useState("");
+ const [filterType, setFilterType] = useState("category");
   const chartRef = useRef(null);
   const bankChartRef = useRef(null);
   const chartInstance = useRef(null);
@@ -459,7 +459,6 @@ const SummaryTable = ({ data = [] }) => {
         </>
       )}
 
-      {/* Always rendered filter section */}
       <section>
         <div className="flex gap-4">
           <select
@@ -484,7 +483,6 @@ const SummaryTable = ({ data = [] }) => {
         </div>
       </section>
 
-      {/* Conditional chart + table display */}
       {filterType && (
         <section>
           <div className="flex flex-col md:flex-row gap-6">

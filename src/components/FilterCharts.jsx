@@ -3,7 +3,7 @@ import {normalize,capitalize,} from "../utils/sentimentUtils";
 import {BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,Legend,} from "recharts";
 import { supabase } from "../supabaseClient";
 
-const COLORS = ["#28a745", "#34c759", "#e6f4ea", "#6c757d"];
+const COLORS = ["#28a745", "#34c759", "#75b0ddff", "#6c757d"];
 
 export default function FilterCharts({ data, filterType, selectedApp }) {
   const [isDrilledDown, setIsDrilledDown] = useState(false);
@@ -175,7 +175,14 @@ export default function FilterCharts({ data, filterType, selectedApp }) {
               >
                 {processedData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
-              <Tooltip /><Legend />
+              <Tooltip /><Legend 
+             
+               layout="horizontal"
+  align="center"
+  verticalAlign="bottom"
+  iconType="circle"
+  formatter={(value, entry) => entry.payload.sentiment}
+              />
             </PieChart>
           </ResponsiveContainer>
         );

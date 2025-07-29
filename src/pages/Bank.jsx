@@ -92,7 +92,7 @@ const Bank = ({ data }) => {
         {/* Summary Cards */}
         <SummaryCard title="Total Reviews" value={totalReviews} />
         <SummaryCard title="Avg. Score" value={avgScore} />
-        <SummaryCard title="Review Period" value={reviewPeriod} />
+        {/* <SummaryCard title="Review Period" value={reviewPeriod} /> */}
         <SummaryCard title="Top Complaint Category" value={topComplaintCategory} />
       </div>
 
